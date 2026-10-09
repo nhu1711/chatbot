@@ -17,6 +17,7 @@ export const config = {
   embeddingModel: process.env.EMBEDDING_MODEL || 'gemini-embedding-001',
   similarityThreshold: parseFloat(process.env.SIMILARITY_THRESHOLD || '0.60'),
   topK: parseInt(process.env.TOP_K || '3', 10),
+  qdrantUrl: process.env.QDRANT_URL || 'http://127.0.0.1:6333',
+  qdrantCollection: process.env.QDRANT_COLLECTION || 'hcmc_travel_chunks',
   knowledgeDir: path.join(projectRoot, 'data', 'knowledge'),
-  embeddingsFile: path.join(projectRoot, 'data', 'embeddings.json'),
 };

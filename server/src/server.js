@@ -1,41 +1,29 @@
 import express from 'express';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { config } from './config.js';
 import { retrieveRelevantChunks } from './rag/retriever.js';
 import { generateGroundedAnswer } from './rag/generator.js';
+import { qdrantStore } from './rag/qdrant.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '..');
-
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// In-memory store for loaded embeddings
-let inMemoryChunks = [];
+let indexedChunks = 0;
 
-/**
- * Loads pre-computed embeddings into memory on server start.
- */
-function loadEmbeddingsIntoMemory() {
-  if (fs.existsSync(config.embeddingsFile)) {
-    try {
-      const rawData = fs.readFileSync(config.embeddingsFile, 'utf-8');
-      inMemoryChunks = JSON.parse(rawData);
-      console.log(`[Server] Loaded ${inMemoryChunks.length} chunks from ${config.embeddingsFile} into memory.`);
-    } catch (err) {
-      console.error(`[Server] Error parsing ${config.embeddingsFile}:`, err.message);
-      inMemoryChunks = [];
-    }
-  } else {
-    console.warn(`[Server] Note: ${config.embeddingsFile} not found. Run 'npm run index' to generate embeddings.`);
-    inMemoryChunks = [];
+async function refreshQdrantStatus() {
+  try {
+    indexedChunks = await qdrantStore.count();
+    console.log(`[Server] Qdrant collection "${config.qdrantCollection}" is available with ${indexedChunks} chunks.`);
+  } catch (error) {
+    indexedChunks = 0;
+    console.warn(`[Server] Qdrant is unavailable (${error.message}). Start Qdrant and run 'npm run index'.`);
   }
 }
 
@@ -43,7 +31,7 @@ function loadEmbeddingsIntoMemory() {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    indexedChunks: inMemoryChunks.length,
+    indexedChunks,
   });
 });
 
@@ -59,7 +47,7 @@ app.post('/api/chat', async (req, res) => {
     const query = message.trim();
 
     // Step 1: Retrieve Top-K candidate chunks
-    const retrievedChunks = await retrieveRelevantChunks(query, inMemoryChunks, config.topK);
+    const retrievedChunks = await retrieveRelevantChunks(query, config.topK);
     const bestScore = retrievedChunks[0]?.score || 0;
 
     console.log(`[Chat] Query: "${query}" | Best score: ${bestScore} (Threshold: ${config.similarityThreshold})`);
@@ -96,11 +84,11 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Start server
-loadEmbeddingsIntoMemory();
+// Start server. Qdrant is checked without preventing the health endpoint from starting.
+refreshQdrantStatus();
 
 const server = app.listen(config.port, () => {
   console.log(`[Server] HCMC Travel Assistant running at http://localhost:${config.port}`);
 });
 
-export { app, server, inMemoryChunks };
+export { app, server };

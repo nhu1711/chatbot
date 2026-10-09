@@ -6,7 +6,8 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node src/server.js",
-    "index": "node src/rag/indexer.js"
+    "index": "node src/rag/indexer.js",
+    "test": "node --test"
   },
   "keywords": [
     "hcmc",
@@ -19,6 +20,7 @@
   "license": "ISC",
   "dependencies": {
     "@google/genai": "^2.27.0",
+    "@qdrant/js-client-rest": "^1.16.2",
     "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "express": "^4.21.2"
